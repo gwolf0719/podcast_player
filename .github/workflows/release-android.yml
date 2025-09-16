@@ -51,16 +51,20 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/release.keystore
-          cat > android/key.properties << 'EOF'
+          mkdir -p android/app
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+          cat > android/app/key.properties << 'EOF'
           storePassword=${ANDROID_KEYSTORE_PASSWORD}
           keyPassword=${ANDROID_KEY_PASSWORD}
           keyAlias=${ANDROID_KEY_ALIAS}
           storeFile=release.keystore
           EOF
 
-      - name: 建置 Release APK（若有金鑰則為已簽署）
+      - name: 建置 Release APK（通用）
         run: flutter build apk --release
+
+      - name: 建置 Release APK（依 ABI 拆分）
+        run: flutter build apk --release --split-per-abi
 
       - name: （可選）建置 Debug APK
         if: ${{ github.event.inputs.buildDebug == 'true' }}
@@ -70,18 +74,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: apk-artifacts
-          path: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/flutter-apk/app-debug.apk
+          path: build/app/outputs/flutter-apk/*.apk
           if-no-files-found: warn
 
       - name: 建立 GitHub Release 並附檔
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/flutter-apk/app-debug.apk
+          files: build/app/outputs/flutter-apk/*.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

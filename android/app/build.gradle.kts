@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+ 
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -32,18 +35,21 @@ android {
 
     // 簽章設定：若有 key.properties 則使用 release 簽章，否則退回 debug 簽章
     val keystoreProperties = Properties()
-    val keystorePropertiesFile = rootProject.file("key.properties")
-    if (keystorePropertiesFile.exists()) {
+    val candidateKeyProps = listOf(
+        project.file("key.properties"),            // android/app/key.properties
+        rootProject.file("key.properties"),        // 專案根目錄
+        rootProject.file("android/key.properties") // android/key.properties
+    )
+    val keystorePropertiesFile = candidateKeyProps.firstOrNull { it.exists() }
+    if (keystorePropertiesFile != null && keystorePropertiesFile.exists()) {
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
     }
 
     signingConfigs {
         create("release") {
-            if (keystorePropertiesFile.exists()) {
+            if (keystorePropertiesFile != null && keystorePropertiesFile.exists()) {
                 val alias = keystoreProperties["keyAlias"] as String?
                 val keyPassword = keystoreProperties["keyPassword"] as String?
-import java.util.Properties
-import java.io.FileInputStream
                 val storePassword = keystoreProperties["storePassword"] as String?
                 val storeFilePath = keystoreProperties["storeFile"] as String?
 
@@ -60,7 +66,7 @@ import java.io.FileInputStream
     buildTypes {
         release {
             // 若 key.properties 存在即使用 release 簽章，否則沿用 debug 簽章以確保可建置
-            signingConfig = if (keystorePropertiesFile.exists()) {
+            signingConfig = if (keystorePropertiesFile != null && keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")
