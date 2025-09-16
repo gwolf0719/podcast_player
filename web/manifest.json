@@ -1,11 +1,11 @@
 {
-    "name": "podcast_player",
-    "short_name": "podcast_player",
+    "name": "PawCast",
+    "short_name": "PawCast",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "PawCast - Your friendly podcast companion",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
