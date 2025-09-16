@@ -13,12 +13,12 @@ class PodcastApp extends ConsumerWidget {
     final router = ref.watch(goRouterProvider);
     ref.watch(downloadMaintenanceServiceProvider);
 
+    // 強制使用「明亮模式」：統一 UI/UX 配色，避免暗色模式差異
     return MaterialApp.router(
       title: 'Podcast Player',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.light,
       routerConfig: router,
     );
   }

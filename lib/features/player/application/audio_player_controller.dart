@@ -78,15 +78,6 @@ class AudioPlayerController extends Notifier<PlaybackState?> {
           break;
       }
     });
-    // 防禦：熱重載時舊狀態可能沒有 mode 欄位，補上預設值
-    try {
-      final _ = state?.mode;
-    } catch (_) {
-      if (state != null) {
-        state = state!.copyWith(mode: PlaybackMode.sequential);
-      }
-    }
-
     return null;
   }
 
