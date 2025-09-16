@@ -8,6 +8,8 @@ import '../../player/application/playback_queue_controller.dart';
 import '../../../core/navigation/app_router.dart';
 import 'package:go_router/go_router.dart';
 import '../application/podcast_controller.dart';
+import '../../player/presentation/mini_player.dart';
+import '../../../core/data/models/download_task.dart';
 
 /// Podcast 詳細頁面
 /// 顯示頻道資訊和節目清單，支援播放和加入隊列功能
@@ -263,27 +265,34 @@ class PodcastPage extends ConsumerWidget {
                             ],
                           ),
                         ),
-                        trailing: EpisodeActions(
-                          episode: episode,
-                          podcast: podcast,
-                          task: taskByEpisodeId[episode.id],
+                        trailing: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 180),
+                          child: EpisodeActions(
+                            episode: episode,
+                            podcast: podcast,
+                            task: taskByEpisodeId[episode.id],
+                          ),
                         ),
                         onTap: () {
                           // 點選節目標題也會啟動播放並進入內頁
                           final queueController = ref.read(playbackQueueControllerProvider.notifier);
                           final playerController = ref.read(audioPlayerControllerProvider.notifier);
+                          final task = taskByEpisodeId[episode.id];
+                          final localPath = (task != null && task.status == DownloadStatus.completed)
+                              ? task.filePath
+                              : null;
                           
                           // 立即播放
                           queueController.playNow(
                             podcast,
                             episode,
-                            localFilePath: taskByEpisodeId[episode.id]?.filePath,
+                            localFilePath: localPath,
                           );
                           
                           playerController.playEpisode(
                             podcast,
                             episode,
-                            localFilePath: taskByEpisodeId[episode.id]?.filePath,
+                            localFilePath: localPath,
                           );
                           
                           // 導航到內頁播放器
@@ -307,6 +316,7 @@ class PodcastPage extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) => Center(child: Text('載入節目失敗：$error')),
       ),
+      bottomNavigationBar: const MiniPlayer(),
     );
   }
 

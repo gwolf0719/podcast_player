@@ -1,3 +1,10 @@
+/// 這個檔案負責：
+/// - 單集的操作區（播放、加入隊列、下載）
+/// - 在列表或詳情頁以彈性排版（Wrap）避免窄寬度溢位
+/// - 下載按鈕在不同狀態下（下載中/已完成/失敗）顯示相應控制
+///
+/// 輸入：`Episode`、可選的 `Podcast` 與下載任務 `DownloadTask`
+/// 輸出：操作按鈕群組（Widget）
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -34,6 +41,12 @@ class EpisodeActions extends ConsumerWidget {
 
     final downloadController = ref.read(downloadControllerProvider.notifier);
 
+    // 僅在下載「已完成」時採用本機檔案路徑
+    final localPath =
+        (task != null && task!.status == DownloadStatus.completed)
+            ? task!.filePath
+            : null;
+
     return Wrap(
       spacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
@@ -58,13 +71,13 @@ class EpisodeActions extends ConsumerWidget {
               queueController.playNow(
                 hostPodcast,
                 episode,
-                localFilePath: task?.filePath,
+                localFilePath: localPath,
               );
               
               playerController.playEpisode(
                 hostPodcast,
                 episode,
-                localFilePath: task?.filePath,
+                localFilePath: localPath,
               );
             }
             
@@ -91,7 +104,7 @@ class EpisodeActions extends ConsumerWidget {
                 queueController.playNext(
                   hostPodcast,
                   episode,
-                  localFilePath: task?.filePath,
+                  localFilePath: localPath,
                 );
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('已加入下一首播放')),
@@ -101,7 +114,7 @@ class EpisodeActions extends ConsumerWidget {
                 queueController.addToQueue(
                   hostPodcast,
                   episode,
-                  localFilePath: task?.filePath,
+                  localFilePath: localPath,
                 );
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('已加入播放隊列')),
@@ -190,8 +203,9 @@ class _DownloadButton extends StatelessWidget {
     final status = task?.status;
 
     if (status == DownloadStatus.downloading) {
-      return SizedBox(
-        width: 90,
+      // 緊湊卡片：在極窄寬度（如 ListTile.trailing 的 ~90px）不會溢位
+      return ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 120),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -200,22 +214,24 @@ class _DownloadButton extends StatelessWidget {
             Text(
               '${((task?.progress ?? 0) * 100).round()}%',
               style: Theme.of(context).textTheme.labelSmall,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Wrap(
+              spacing: 8,
+              alignment: WrapAlignment.center,
               children: [
-                IconButton(
+                _compactIconButton(
+                  context: context,
                   tooltip: '暫停下載',
-                  iconSize: 18,
+                  icon: Icons.pause,
                   onPressed: () => controller.pauseDownload(task!.id),
-                  icon: const Icon(Icons.pause),
                 ),
-                IconButton(
+                _compactIconButton(
+                  context: context,
                   tooltip: '取消下載',
-                  iconSize: 18,
+                  icon: Icons.close,
                   onPressed: () => controller.cancelDownload(task!.id),
-                  icon: const Icon(Icons.close),
                 ),
               ],
             ),
@@ -273,4 +289,22 @@ class _DownloadButton extends StatelessWidget {
       },
     );
   }
+}
+
+/// 建立緊湊型 IconButton 以適配窄寬度容器
+Widget _compactIconButton({
+  required BuildContext context,
+  required String tooltip,
+  required IconData icon,
+  required VoidCallback onPressed,
+}) {
+  return IconButton(
+    tooltip: tooltip,
+    icon: Icon(icon),
+    onPressed: onPressed,
+    iconSize: 18,
+    padding: EdgeInsets.zero,
+    visualDensity: VisualDensity.compact,
+    constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+  );
 }

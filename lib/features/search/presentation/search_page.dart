@@ -167,17 +167,25 @@ class _SearchResultList extends ConsumerWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                trailing: Wrap(
-                  spacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    if (episode.duration != null)
-                      Text(_formatDuration(episode.duration!)),
-                    EpisodeActions(
-                      episode: episode,
-                      task: taskByEpisodeId[episode.id],
-                    ),
-                  ],
+                trailing: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 200),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      if (episode.duration != null)
+                        Text(
+                          _formatDuration(episode.duration!),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      EpisodeActions(
+                        episode: episode,
+                        task: taskByEpisodeId[episode.id],
+                      ),
+                    ],
+                  ),
                 ),
                 onTap: () {
                   context.pushNamed(

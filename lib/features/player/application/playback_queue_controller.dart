@@ -150,6 +150,13 @@ class PlaybackQueueController extends Notifier<PlaybackQueue> {
     return null;
   }
 
+  /// 直接移動到指定索引，回傳新當前曲目
+  QueueEpisode? moveToIndex(int index) {
+    if (index < 0 || index >= state.episodes.length) return null;
+    state = state.copyWith(currentIndex: index);
+    return state.currentEpisode;
+  }
+
   /// 從隊列中移除節目
   void removeFromQueue(int index) {
     if (index >= 0 && index < state.episodes.length) {

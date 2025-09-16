@@ -1,12 +1,18 @@
+/// 這個檔案負責：
+/// - 資料庫（Library）頁的 UI 呈現：訂閱、下載、播放清單
+/// - 訂閱分頁支援點擊項目導向頻道內容頁
+/// - 匯入/匯出 OPML 與下載任務管理
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/data/models/podcast.dart';
 import '../../../core/data/models/download_task.dart';
 import '../../../core/data/services/opml_service.dart';
 import '../../download/application/download_controller.dart';
 import '../application/subscription_controller.dart';
+import '../../../core/navigation/app_router.dart';
 
 class LibraryPage extends ConsumerWidget {
   const LibraryPage({super.key});
@@ -262,19 +268,33 @@ class _SubscriptionsTab extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             itemBuilder: (context, index) {
               final podcast = subscriptions[index];
-              return Card(
-                child: ListTile(
-                  leading: const Icon(Icons.podcasts),
-                  title: Text(podcast.title),
-                  subtitle: Text(
-                    podcast.author,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: IconButton(
-                    tooltip: '退訂',
-                    icon: const Icon(Icons.close),
-                    onPressed: () => onUnsubscribe(podcast.feedUrl),
+              // 右划退訂：以 Dismissible 取代按鈕刪除
+              return Dismissible(
+                key: ValueKey('sub_${podcast.feedUrl}'),
+                direction: DismissDirection.startToEnd,
+                background: _buildDismissBackground(context, label: '退訂'),
+                onDismissed: (_) {
+                  onUnsubscribe(podcast.feedUrl);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('已退訂：${podcast.title}')),
+                  );
+                },
+                child: Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.podcasts),
+                    title: Text(podcast.title),
+                    subtitle: Text(
+                      podcast.author,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    // 點擊訂閱項目以進入頻道內容頁
+                    onTap: () {
+                      context.pushNamed(
+                        PodcastRoute.name,
+                        pathParameters: {'podcastId': podcast.id},
+                      );
+                    },
                   ),
                 ),
               );
@@ -361,20 +381,47 @@ class _DownloadsTab extends StatelessWidget {
       itemBuilder: (context, index) {
         final task = tasks[index];
 
-        return Card(
-          child: ListTile(
-            leading: Icon(_statusIcon(task.status)),
-            title: Text(task.episodeTitle),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(task.podcastTitle),
-                const SizedBox(height: 4),
-                _buildProgressRow(context, task),
-              ],
+        // 右划刪除/取消：使用 Dismissible 控制刪除類動作
+        return Dismissible(
+          key: ValueKey('dl_${task.id}'),
+          direction: DismissDirection.startToEnd,
+          background: _buildDismissBackground(
+            context,
+            label: _dismissLabelFor(task.status),
+          ),
+          onDismissed: (_) {
+            switch (task.status) {
+              case DownloadStatus.downloading:
+              case DownloadStatus.queued:
+                onCancel(task.id);
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(const SnackBar(content: Text('已取消下載')));
+                break;
+              case DownloadStatus.completed:
+              case DownloadStatus.paused:
+              case DownloadStatus.failed:
+              case DownloadStatus.canceled:
+                onRemove(task.id);
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(const SnackBar(content: Text('已移除下載任務')));
+                break;
+            }
+          },
+          child: Card(
+            child: ListTile(
+              leading: Icon(_statusIcon(task.status)),
+              title: Text(task.episodeTitle),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(task.podcastTitle),
+                  const SizedBox(height: 4),
+                  _buildProgressRow(context, task),
+                ],
+              ),
+              trailing: _buildActions(task),
             ),
-            trailing: _buildActions(task),
           ),
         );
       },
@@ -436,11 +483,6 @@ class _DownloadsTab extends StatelessWidget {
               icon: const Icon(Icons.pause),
               onPressed: () => onPause(task.id),
             ),
-            IconButton(
-              tooltip: '取消下載',
-              icon: const Icon(Icons.stop_circle_outlined),
-              onPressed: () => onCancel(task.id),
-            ),
           ],
         );
       case DownloadStatus.paused:
@@ -460,11 +502,6 @@ class _DownloadsTab extends StatelessWidget {
           spacing: 8,
           children: [
             protectButton,
-            IconButton(
-              tooltip: '取消排隊',
-              icon: const Icon(Icons.schedule),
-              onPressed: () => onCancel(task.id),
-            ),
           ],
         );
       case DownloadStatus.completed:
@@ -472,11 +509,6 @@ class _DownloadsTab extends StatelessWidget {
           spacing: 8,
           children: [
             protectButton,
-            IconButton(
-              tooltip: '移除',
-              icon: const Icon(Icons.delete_outline),
-              onPressed: () => onRemove(task.id),
-            ),
           ],
         );
       case DownloadStatus.failed:
@@ -492,6 +524,46 @@ class _DownloadsTab extends StatelessWidget {
             ),
           ],
         );
+    }
+  }
+
+  /// 右划刪除/取消的背景樣式
+  /// 輸入：`label` 顯示動作文字
+  /// 輸出：帶有圖示與錯誤色的輔助背景
+  Widget _buildDismissBackground(BuildContext context, {required String label}) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      color: scheme.errorContainer,
+      child: Row(
+        children: [
+          Icon(Icons.delete_outline, color: scheme.onErrorContainer),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: scheme.onErrorContainer,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 根據下載狀態決定右划的提示文字
+  String _dismissLabelFor(DownloadStatus status) {
+    switch (status) {
+      case DownloadStatus.downloading:
+        return '取消下載';
+      case DownloadStatus.queued:
+        return '取消排隊';
+      case DownloadStatus.completed:
+      case DownloadStatus.paused:
+      case DownloadStatus.failed:
+      case DownloadStatus.canceled:
+        return '移除';
     }
   }
 
@@ -511,4 +583,29 @@ class _DownloadsTab extends StatelessWidget {
         return Icons.schedule;
     }
   }
+}
+
+/// 通用的 Dismissible 背景（退訂/刪除提示）
+/// 輸入：`label` 顯示文字
+/// 輸出：錯誤色背景＋刪除圖示
+Widget _buildDismissBackground(BuildContext context, {required String label}) {
+  final scheme = Theme.of(context).colorScheme;
+  return Container(
+    alignment: Alignment.centerLeft,
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    color: scheme.errorContainer,
+    child: Row(
+      children: [
+        Icon(Icons.delete_outline, color: scheme.onErrorContainer),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TextStyle(
+            color: scheme.onErrorContainer,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    ),
+  );
 }
