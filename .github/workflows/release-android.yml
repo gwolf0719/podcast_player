@@ -1,0 +1,87 @@
+# 這個 GitHub Actions 工作流程負責：
+# - 在標記（tag）版本時自動建置 Android APK
+# - 若設定金鑰秘密變數，將產出「已簽署」的 release APK
+# - 建立 GitHub Release 並附上 APK 檔供下載
+
+name: Android APK Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      buildDebug:
+        description: '同時建置 Debug APK (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 取出程式碼
+        uses: actions/checkout@v4
+
+      - name: 設定 Java 17（配合 Flutter/AGP）
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 安裝 Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+
+      - name: Flutter 版本與環境
+        run: |
+          flutter --version
+          flutter doctor -v
+
+      - name: 安裝相依套件
+        run: flutter pub get
+
+      - name: （可選）建立簽章金鑰與屬性檔
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/release.keystore
+          cat > android/key.properties << 'EOF'
+          storePassword=${ANDROID_KEYSTORE_PASSWORD}
+          keyPassword=${ANDROID_KEY_PASSWORD}
+          keyAlias=${ANDROID_KEY_ALIAS}
+          storeFile=release.keystore
+          EOF
+
+      - name: 建置 Release APK（若有金鑰則為已簽署）
+        run: flutter build apk --release
+
+      - name: （可選）建置 Debug APK
+        if: ${{ github.event.inputs.buildDebug == 'true' }}
+        run: flutter build apk --debug
+
+      - name: 上傳建置產物（Artifacts）
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-artifacts
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: warn
+
+      - name: 建立 GitHub Release 並附檔
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/app-debug.apk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

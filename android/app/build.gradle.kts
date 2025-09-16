@@ -30,11 +30,41 @@ android {
         versionName = flutter.versionName
     }
 
+    // 簽章設定：若有 key.properties 則使用 release 簽章，否則退回 debug 簽章
+    val keystoreProperties = Properties()
+    val keystorePropertiesFile = rootProject.file("key.properties")
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    }
+
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                val alias = keystoreProperties["keyAlias"] as String?
+                val keyPassword = keystoreProperties["keyPassword"] as String?
+import java.util.Properties
+import java.io.FileInputStream
+                val storePassword = keystoreProperties["storePassword"] as String?
+                val storeFilePath = keystoreProperties["storeFile"] as String?
+
+                if (alias != null && keyPassword != null && storePassword != null && storeFilePath != null) {
+                    this.keyAlias = alias
+                    this.keyPassword = keyPassword
+                    this.storePassword = storePassword
+                    this.storeFile = file(storeFilePath)
+                }
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // 若 key.properties 存在即使用 release 簽章，否則沿用 debug 簽章以確保可建置
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
