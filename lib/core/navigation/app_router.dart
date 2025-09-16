@@ -20,7 +20,29 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: DiscoverRoute.path,
     navigatorKey: _rootNavigatorKey,
+    errorBuilder: (context, state) => Scaffold(
+      appBar: AppBar(title: const Text('導航錯誤')),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48),
+            const SizedBox(height: 12),
+            Text(state.error?.toString() ?? '未知錯誤'),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () => GoRouter.of(context).go(DiscoverRoute.path),
+              child: const Text('回到探索頁'),
+            ),
+          ],
+        ),
+      ),
+    ),
     routes: [
+      GoRoute(
+        path: '/',
+        redirect: (_, __) => DiscoverRoute.path,
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             HomeNavigationScaffold(navigationShell: navigationShell),
