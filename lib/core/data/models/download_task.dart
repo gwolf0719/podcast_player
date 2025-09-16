@@ -1,4 +1,4 @@
-enum DownloadStatus { queued, downloading, completed, failed, canceled }
+enum DownloadStatus { queued, downloading, paused, completed, failed, canceled }
 
 class DownloadTask {
   const DownloadTask({
@@ -12,6 +12,8 @@ class DownloadTask {
     required this.createdAt,
     this.errorMessage,
     this.filePath,
+    this.isProtected = false,
+    this.completedAt,
   });
 
   final String id;
@@ -24,12 +26,16 @@ class DownloadTask {
   final String? errorMessage;
   final String? filePath;
   final DateTime createdAt;
+  final bool isProtected;
+  final DateTime? completedAt;
 
   DownloadTask copyWith({
     DownloadStatus? status,
     double? progress,
     Object? errorMessage = _noUpdate,
     Object? filePath = _noUpdate,
+    bool? isProtected,
+    Object? completedAt = _noUpdate,
   }) {
     return DownloadTask(
       id: id,
@@ -44,6 +50,10 @@ class DownloadTask {
           : errorMessage as String?,
       filePath: filePath == _noUpdate ? this.filePath : filePath as String?,
       createdAt: createdAt,
+      isProtected: isProtected ?? this.isProtected,
+      completedAt: completedAt == _noUpdate
+          ? this.completedAt
+          : completedAt as DateTime?,
     );
   }
 
@@ -59,6 +69,8 @@ class DownloadTask {
       'error_message': errorMessage,
       'file_path': filePath,
       'created_at': createdAt.millisecondsSinceEpoch,
+      'is_protected': isProtected ? 1 : 0,
+      'completed_at': completedAt?.millisecondsSinceEpoch,
     };
   }
 
@@ -78,6 +90,12 @@ class DownloadTask {
       createdAt: DateTime.fromMillisecondsSinceEpoch(
         (map['created_at'] as num).toInt(),
       ),
+      isProtected: (map['is_protected'] as int? ?? 0) == 1,
+      completedAt: (map['completed_at'] as int?) == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(
+              (map['completed_at'] as num).toInt(),
+            ),
     );
   }
 }

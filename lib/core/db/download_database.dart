@@ -25,7 +25,7 @@ class DownloadDatabase {
     final dbPath = overridePath ?? await _defaultPath();
     _database = await openDatabase(
       dbPath,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
 CREATE TABLE downloads (
@@ -38,9 +38,21 @@ CREATE TABLE downloads (
   progress REAL,
   error_message TEXT,
   file_path TEXT,
-  created_at INTEGER
+  created_at INTEGER,
+  is_protected INTEGER NOT NULL DEFAULT 0,
+  completed_at INTEGER
 )
 ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute(
+            'ALTER TABLE downloads ADD COLUMN is_protected INTEGER NOT NULL DEFAULT 0',
+          );
+          await db.execute(
+            'ALTER TABLE downloads ADD COLUMN completed_at INTEGER',
+          );
+        }
       },
     );
 

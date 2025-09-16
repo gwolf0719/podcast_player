@@ -6,6 +6,7 @@ import '../../../core/data/models/podcast.dart';
 import '../../library/application/subscription_controller.dart';
 import '../../../widgets/podcast_card.dart';
 import 'discover_controller.dart';
+import 'discover_filter_controller.dart';
 import '../../../core/navigation/app_router.dart';
 
 class DiscoverPage extends ConsumerWidget {
@@ -37,9 +38,18 @@ class _DiscoverContent extends ConsumerWidget {
     final subscriptionController = ref.read(
       subscriptionControllerProvider.notifier,
     );
+    final filterState = ref.watch(discoverFilterControllerProvider);
+    final filterController =
+        ref.read(discoverFilterControllerProvider.notifier);
     final subscribedFeeds = subscriptions
         .map((podcast) => podcast.feedUrl)
         .toSet();
+
+    final categoryOptions = _buildCategoryOptions(podcasts);
+    final filteredPodcasts = _applyFilters(
+      podcasts,
+      filterState,
+    );
 
     return RefreshIndicator(
       onRefresh: () => ref.read(discoverControllerProvider.notifier).refresh(),
@@ -56,6 +66,17 @@ class _DiscoverContent extends ConsumerWidget {
             return ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               children: const [_DiscoverEmptyView()],
+            );
+          }
+
+          if (filteredPodcasts.isEmpty) {
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: const [
+                _DiscoverEmptyView(
+                  message: '找不到符合條件的熱門節目，請調整篩選條件。',
+                ),
+              ],
             );
           }
 
@@ -83,6 +104,22 @@ class _DiscoverContent extends ConsumerWidget {
               ),
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverToBoxAdapter(
+                  child: _DiscoverFilters(
+                    categories: categoryOptions,
+                    state: filterState,
+                    onCategoryChanged: filterController.updateCategory,
+                    onSortChanged: (option) {
+                      if (option != null) {
+                        filterController.updateSortOption(option);
+                      }
+                    },
+                    onReset: filterController.reset,
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverGrid(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
@@ -91,7 +128,7 @@ class _DiscoverContent extends ConsumerWidget {
                     mainAxisExtent: 210,
                   ),
                   delegate: SliverChildBuilderDelegate((context, index) {
-                    final podcast = podcasts[index];
+                    final podcast = filteredPodcasts[index];
                     final isSubscribed = subscribedFeeds.contains(
                       podcast.feedUrl,
                     );
@@ -112,7 +149,7 @@ class _DiscoverContent extends ConsumerWidget {
                           pathParameters: {'podcastId': podcast.id},
                       ),
                     );
-                  }, childCount: podcasts.length),
+                  }, childCount: filteredPodcasts.length),
                 ),
               ),
             ],
@@ -121,10 +158,138 @@ class _DiscoverContent extends ConsumerWidget {
       ),
     );
   }
+
+  List<String> _buildCategoryOptions(List<Podcast> items) {
+    final categories = <String>{};
+    for (final podcast in items) {
+      if (podcast.category != null && podcast.category!.trim().isNotEmpty) {
+        categories.add(podcast.category!.trim());
+      }
+    }
+    return categories.toList()..sort();
+  }
+
+  List<Podcast> _applyFilters(
+    List<Podcast> source,
+    DiscoverFilterState filter,
+  ) {
+    final list = <Podcast>[];
+    for (final podcast in source) {
+      if (filter.selectedCategory != null) {
+        final category = podcast.category?.trim();
+        if (category != filter.selectedCategory) {
+          continue;
+        }
+      }
+      list.add(podcast);
+    }
+
+    if (filter.sortOption == DiscoverSortOption.title) {
+      list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+    }
+
+    return list;
+  }
+}
+
+class _DiscoverFilters extends StatelessWidget {
+  const _DiscoverFilters({
+    required this.categories,
+    required this.state,
+    required this.onCategoryChanged,
+    required this.onSortChanged,
+    required this.onReset,
+  });
+
+  final List<String> categories;
+  final DiscoverFilterState state;
+  final void Function(String?) onCategoryChanged;
+  final void Function(DiscoverSortOption?) onSortChanged;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (categories.isNotEmpty) ...[
+          Text('熱門分類', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: const Text('全部'),
+                    selected: state.selectedCategory == null,
+                    onSelected: (_) => onCategoryChanged(null),
+                  ),
+                ),
+                ...categories.map(
+                  (category) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(category),
+                      selected: state.selectedCategory == category,
+                      onSelected: (_) => onCategoryChanged(category),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+        Text('排序與其他設定', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SizedBox(
+              width: 220,
+              child: DropdownButtonFormField<DiscoverSortOption>(
+                value: state.sortOption,
+                decoration: const InputDecoration(
+                  labelText: '排序方式',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: const [
+                  DropdownMenuItem<DiscoverSortOption>(
+                    value: DiscoverSortOption.ranking,
+                    child: Text('依熱門排名'),
+                  ),
+                  DropdownMenuItem<DiscoverSortOption>(
+                    value: DiscoverSortOption.title,
+                    child: Text('依節目名稱'),
+                  ),
+                ],
+                onChanged: onSortChanged,
+              ),
+            ),
+            FilledButton.tonalIcon(
+              onPressed: onReset,
+              icon: const Icon(Icons.refresh),
+              label: const Text('重設條件'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
 }
 
 class _DiscoverEmptyView extends StatelessWidget {
-  const _DiscoverEmptyView();
+  const _DiscoverEmptyView({
+    this.message = '目前沒有熱門節目資料',
+  });
+
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -139,7 +304,7 @@ class _DiscoverEmptyView extends StatelessWidget {
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: 12),
-          Text('目前沒有熱門節目資料', style: Theme.of(context).textTheme.titleMedium),
+          Text(message, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(
             '稍後再試或下拉重新整理。',

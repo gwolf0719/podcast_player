@@ -5,6 +5,7 @@ import '../../../core/data/models/podcast.dart' as models show Episode;
 import '../../../core/data/preview/fake_podcasts.dart';
 import '../../../core/data/repositories/episode_repository.dart';
 import '../../../core/network/podcast_feed_client.dart';
+import '../../download/application/download_controller.dart';
 
 final podcastDetailControllerProvider =
     AutoDisposeAsyncNotifierProviderFamily<
@@ -81,6 +82,12 @@ class PodcastDetailController
           episodes: stored,
         );
       }
+    }
+
+    final resolved = base;
+    if (resolved != null && resolved.episodes.isNotEmpty) {
+      final downloadController = ref.read(downloadControllerProvider.notifier);
+      await downloadController.applyAutoDownloadRules(resolved, resolved.episodes);
     }
 
     return base;

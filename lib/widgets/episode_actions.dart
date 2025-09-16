@@ -91,23 +91,50 @@ class _DownloadButton extends StatelessWidget {
 
     if (status == DownloadStatus.downloading) {
       return SizedBox(
-        width: 70,
+        width: 90,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             LinearProgressIndicator(value: task?.progress ?? 0),
+            const SizedBox(height: 4),
             Text(
               '${((task?.progress ?? 0) * 100).round()}%',
               style: Theme.of(context).textTheme.labelSmall,
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  tooltip: '暫停下載',
+                  iconSize: 18,
+                  onPressed: () => controller.pauseDownload(task!.id),
+                  icon: const Icon(Icons.pause),
+                ),
+                IconButton(
+                  tooltip: '取消下載',
+                  iconSize: 18,
+                  onPressed: () => controller.cancelDownload(task!.id),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
             ),
           ],
         ),
       );
     }
 
+    if (status == DownloadStatus.paused) {
+      return IconButton(
+        tooltip: '繼續下載',
+        icon: const Icon(Icons.play_arrow),
+        onPressed: () => controller.resumeDownload(task!.id),
+      );
+    }
+
     if (status == DownloadStatus.queued) {
       return IconButton(
-        tooltip: '等待下載',
+        tooltip: task?.errorMessage ?? '等待下載',
         onPressed: () => controller.cancelDownload(task!.id),
         icon: const Icon(Icons.schedule),
       );

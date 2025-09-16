@@ -47,6 +47,15 @@ class LibraryPage extends ConsumerWidget {
                   onRemove: (id) => ref
                       .read(downloadControllerProvider.notifier)
                       .removeTask(id),
+                  onPause: (id) => ref
+                      .read(downloadControllerProvider.notifier)
+                      .pauseDownload(id),
+                  onResume: (id) => ref
+                      .read(downloadControllerProvider.notifier)
+                      .resumeDownload(id),
+                  onToggleProtection: (id) => ref
+                      .read(downloadControllerProvider.notifier)
+                      .toggleProtection(id),
                 ),
                 const _LibraryPlaceholder(
                   icon: Icons.playlist_play,
@@ -324,12 +333,18 @@ class _DownloadsTab extends StatelessWidget {
     required this.onCancel,
     required this.onRetry,
     required this.onRemove,
+    required this.onPause,
+    required this.onResume,
+    required this.onToggleProtection,
   });
 
   final List<DownloadTask> tasks;
   final void Function(String) onCancel;
   final void Function(String) onRetry;
   final void Function(String) onRemove;
+  final void Function(String) onPause;
+  final void Function(String) onResume;
+  final void Function(String) onToggleProtection;
 
   @override
   Widget build(BuildContext context) {
@@ -384,6 +399,8 @@ class _DownloadsTab extends StatelessWidget {
         );
       case DownloadStatus.completed:
         return Text('已完成', style: Theme.of(context).textTheme.bodySmall);
+      case DownloadStatus.paused:
+        return Text('已暫停', style: Theme.of(context).textTheme.bodySmall);
       case DownloadStatus.canceled:
         return Text('已取消', style: Theme.of(context).textTheme.bodySmall);
       case DownloadStatus.failed:
@@ -394,36 +411,86 @@ class _DownloadsTab extends StatelessWidget {
           ),
         );
       case DownloadStatus.queued:
-        return Text('等待下載', style: Theme.of(context).textTheme.bodySmall);
+        final message = task.errorMessage ?? '等待下載';
+        return Text(
+          message,
+          style: Theme.of(context).textTheme.bodySmall,
+        );
     }
   }
 
   Widget _buildActions(DownloadTask task) {
+    final protectButton = IconButton(
+      tooltip: task.isProtected ? '取消保留' : '保留此檔案',
+      icon: Icon(task.isProtected ? Icons.star : Icons.star_border),
+      onPressed: () => onToggleProtection(task.id),
+    );
     switch (task.status) {
       case DownloadStatus.downloading:
-        return IconButton(
-          tooltip: '取消下載',
-          icon: const Icon(Icons.stop_circle_outlined),
-          onPressed: () => onCancel(task.id),
+        return Wrap(
+          spacing: 8,
+          children: [
+            protectButton,
+            IconButton(
+              tooltip: '暫停下載',
+              icon: const Icon(Icons.pause),
+              onPressed: () => onPause(task.id),
+            ),
+            IconButton(
+              tooltip: '取消下載',
+              icon: const Icon(Icons.stop_circle_outlined),
+              onPressed: () => onCancel(task.id),
+            ),
+          ],
+        );
+      case DownloadStatus.paused:
+        return Wrap(
+          spacing: 8,
+          children: [
+            protectButton,
+            IconButton(
+              tooltip: '繼續下載',
+              icon: const Icon(Icons.play_arrow),
+              onPressed: () => onResume(task.id),
+            ),
+          ],
         );
       case DownloadStatus.queued:
-        return IconButton(
-          tooltip: '取消排隊',
-          icon: const Icon(Icons.schedule),
-          onPressed: () => onCancel(task.id),
+        return Wrap(
+          spacing: 8,
+          children: [
+            protectButton,
+            IconButton(
+              tooltip: '取消排隊',
+              icon: const Icon(Icons.schedule),
+              onPressed: () => onCancel(task.id),
+            ),
+          ],
         );
       case DownloadStatus.completed:
-        return IconButton(
-          tooltip: '移除',
-          icon: const Icon(Icons.delete_outline),
-          onPressed: () => onRemove(task.id),
+        return Wrap(
+          spacing: 8,
+          children: [
+            protectButton,
+            IconButton(
+              tooltip: '移除',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () => onRemove(task.id),
+            ),
+          ],
         );
       case DownloadStatus.failed:
       case DownloadStatus.canceled:
-        return IconButton(
-          tooltip: '重試',
-          icon: const Icon(Icons.refresh),
-          onPressed: () => onRetry(task.id),
+        return Wrap(
+          spacing: 8,
+          children: [
+            protectButton,
+            IconButton(
+              tooltip: '重試',
+              icon: const Icon(Icons.refresh),
+              onPressed: () => onRetry(task.id),
+            ),
+          ],
         );
     }
   }
@@ -432,6 +499,8 @@ class _DownloadsTab extends StatelessWidget {
     switch (status) {
       case DownloadStatus.downloading:
         return Icons.downloading;
+      case DownloadStatus.paused:
+        return Icons.pause_circle_outline;
       case DownloadStatus.completed:
         return Icons.check_circle_outline;
       case DownloadStatus.failed:
