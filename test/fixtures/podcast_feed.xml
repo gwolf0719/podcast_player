@@ -1,0 +1,22 @@
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Sample Podcast A</title>
+    <item>
+      <guid>ep1</guid>
+      <title>Episode One</title>
+      <description>First episode description.</description>
+      <enclosure url="https://example.com/audio1.mp3" length="12345" type="audio/mpeg" />
+      <pubDate>Tue, 02 Jan 2024 10:00:00 GMT</pubDate>
+      <itunes:duration>3600</itunes:duration>
+      <itunes:image href="https://example.com/ep1.jpg" />
+    </item>
+    <item>
+      <guid>ep2</guid>
+      <title>Episode Two</title>
+      <description>Second episode description.</description>
+      <enclosure url="https://example.com/audio2.mp3" length="67890" type="audio/mpeg" />
+      <pubDate>Wed, 03 Jan 2024 12:00:00 GMT</pubDate>
+      <itunes:duration>01:00:00</itunes:duration>
+    </item>
+  </channel>
+</rss>

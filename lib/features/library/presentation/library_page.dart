@@ -1,0 +1,445 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/data/models/podcast.dart';
+import '../../../core/data/models/download_task.dart';
+import '../../../core/data/services/opml_service.dart';
+import '../../download/application/download_controller.dart';
+import '../application/subscription_controller.dart';
+
+class LibraryPage extends ConsumerWidget {
+  const LibraryPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final subscriptions = ref.watch(subscriptionControllerProvider);
+
+    return DefaultTabController(
+      length: 3,
+      child: Column(
+        children: [
+          const TabBar(
+            tabs: [
+              Tab(text: '訂閱'),
+              Tab(text: '下載'),
+              Tab(text: '播放清單'),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _SubscriptionsTab(
+                  subscriptions: subscriptions,
+                  onUnsubscribe: (feedUrl) => ref
+                      .read(subscriptionControllerProvider.notifier)
+                      .unsubscribe(feedUrl),
+                  onImport: () => _importOpml(context, ref),
+                  onExport: () => _exportOpml(context, ref, subscriptions),
+                ),
+                _DownloadsTab(
+                  tasks: ref.watch(downloadControllerProvider),
+                  onCancel: (id) => ref
+                      .read(downloadControllerProvider.notifier)
+                      .cancelDownload(id),
+                  onRetry: (id) =>
+                      ref.read(downloadControllerProvider.notifier).retry(id),
+                  onRemove: (id) => ref
+                      .read(downloadControllerProvider.notifier)
+                      .removeTask(id),
+                ),
+                const _LibraryPlaceholder(
+                  icon: Icons.playlist_play,
+                  title: '建立你的播放清單',
+                  description: '智慧清單與手動清單目前僅提供規格展示。',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _exportOpml(
+    BuildContext context,
+    WidgetRef ref,
+    List<Podcast> podcasts,
+  ) async {
+    if (podcasts.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('目前沒有可匯出的訂閱節目。')));
+      return;
+    }
+
+    final opmlService = ref.read(opmlServiceProvider);
+    final opmlContent = opmlService.exportToOpml(podcasts);
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('匯出 OPML'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(child: SelectableText(opmlContent)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: opmlContent));
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('已複製 OPML 到剪貼簿')));
+              },
+              child: const Text('複製'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('關閉'),
+            ),
+          ],
+        );
+      },
+    );
+    if (!context.mounted) {
+      return;
+    }
+  }
+
+  Future<void> _importOpml(BuildContext context, WidgetRef ref) async {
+    final textController = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('匯入 OPML'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: TextField(
+              controller: textController,
+              maxLines: 10,
+              decoration: const InputDecoration(
+                hintText: '貼上 OPML 內容或 RSS 清單',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(context).pop(textController.text.trim()),
+              child: const Text('匯入'),
+            ),
+          ],
+        );
+      },
+    );
+    textController.dispose();
+
+    if (result == null || result.isEmpty) {
+      return;
+    }
+
+    if (!context.mounted) {
+      return;
+    }
+
+    final opmlService = ref.read(opmlServiceProvider);
+    final controller = ref.read(subscriptionControllerProvider.notifier);
+
+    try {
+      final items = opmlService.importFromOpml(result);
+      var added = 0;
+      for (final podcast in items) {
+        if (!controller.isSubscribed(podcast.feedUrl)) {
+          await controller.subscribe(podcast);
+          added += 1;
+        }
+      }
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('匯入完成，共新增 $added 個節目。')));
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('匯入失敗：$error')));
+    }
+  }
+}
+
+class _SubscriptionsTab extends StatelessWidget {
+  const _SubscriptionsTab({
+    required this.subscriptions,
+    required this.onUnsubscribe,
+    required this.onImport,
+    required this.onExport,
+  });
+
+  final List<Podcast> subscriptions;
+  final Future<void> Function(String feedUrl) onUnsubscribe;
+  final Future<void> Function() onImport;
+  final Future<void> Function() onExport;
+
+  @override
+  Widget build(BuildContext context) {
+    if (subscriptions.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.subscriptions_outlined,
+                size: 48,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 12),
+              Text('尚未新增訂閱', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Text(
+                '探索或匯入 OPML 後即可在這裡管理訂閱的節目。',
+                style: Theme.of(context).textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () => onImport(),
+                icon: const Icon(Icons.file_download_outlined),
+                label: const Text('匯入 OPML'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              FilledButton.icon(
+                onPressed: onImport,
+                icon: const Icon(Icons.file_download_outlined),
+                label: const Text('匯入'),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: () => onExport(),
+                icon: const Icon(Icons.file_upload_outlined),
+                label: const Text('匯出'),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            itemBuilder: (context, index) {
+              final podcast = subscriptions[index];
+              return Card(
+                child: ListTile(
+                  leading: const Icon(Icons.podcasts),
+                  title: Text(podcast.title),
+                  subtitle: Text(
+                    podcast.author,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: IconButton(
+                    tooltip: '退訂',
+                    icon: const Icon(Icons.close),
+                    onPressed: () => onUnsubscribe(podcast.feedUrl),
+                  ),
+                ),
+              );
+            },
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemCount: subscriptions.length,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LibraryPlaceholder extends StatelessWidget {
+  const _LibraryPlaceholder({
+    required this.icon,
+    required this.title,
+    required this.description,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 48,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 12),
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              description,
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DownloadsTab extends StatelessWidget {
+  const _DownloadsTab({
+    required this.tasks,
+    required this.onCancel,
+    required this.onRetry,
+    required this.onRemove,
+  });
+
+  final List<DownloadTask> tasks;
+  final void Function(String) onCancel;
+  final void Function(String) onRetry;
+  final void Function(String) onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    if (tasks.isEmpty) {
+      return const _LibraryPlaceholder(
+        icon: Icons.download_outlined,
+        title: '沒有下載中的單集',
+        description: '從搜尋或探索頁下載後，會在這裡顯示進度與狀態。',
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemBuilder: (context, index) {
+        final task = tasks[index];
+
+        return Card(
+          child: ListTile(
+            leading: Icon(_statusIcon(task.status)),
+            title: Text(task.episodeTitle),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(task.podcastTitle),
+                const SizedBox(height: 4),
+                _buildProgressRow(context, task),
+              ],
+            ),
+            trailing: _buildActions(task),
+          ),
+        );
+      },
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemCount: tasks.length,
+    );
+  }
+
+  Widget _buildProgressRow(BuildContext context, DownloadTask task) {
+    switch (task.status) {
+      case DownloadStatus.downloading:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            LinearProgressIndicator(value: task.progress),
+            const SizedBox(height: 4),
+            Text(
+              '下載中 ${(task.progress * 100).round()}%',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        );
+      case DownloadStatus.completed:
+        return Text('已完成', style: Theme.of(context).textTheme.bodySmall);
+      case DownloadStatus.canceled:
+        return Text('已取消', style: Theme.of(context).textTheme.bodySmall);
+      case DownloadStatus.failed:
+        return Text(
+          '下載失敗：${task.errorMessage ?? '未知錯誤'}',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.error,
+          ),
+        );
+      case DownloadStatus.queued:
+        return Text('等待下載', style: Theme.of(context).textTheme.bodySmall);
+    }
+  }
+
+  Widget _buildActions(DownloadTask task) {
+    switch (task.status) {
+      case DownloadStatus.downloading:
+        return IconButton(
+          tooltip: '取消下載',
+          icon: const Icon(Icons.stop_circle_outlined),
+          onPressed: () => onCancel(task.id),
+        );
+      case DownloadStatus.queued:
+        return IconButton(
+          tooltip: '取消排隊',
+          icon: const Icon(Icons.schedule),
+          onPressed: () => onCancel(task.id),
+        );
+      case DownloadStatus.completed:
+        return IconButton(
+          tooltip: '移除',
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () => onRemove(task.id),
+        );
+      case DownloadStatus.failed:
+      case DownloadStatus.canceled:
+        return IconButton(
+          tooltip: '重試',
+          icon: const Icon(Icons.refresh),
+          onPressed: () => onRetry(task.id),
+        );
+    }
+  }
+
+  IconData _statusIcon(DownloadStatus status) {
+    switch (status) {
+      case DownloadStatus.downloading:
+        return Icons.downloading;
+      case DownloadStatus.completed:
+        return Icons.check_circle_outline;
+      case DownloadStatus.failed:
+        return Icons.error_outline;
+      case DownloadStatus.canceled:
+        return Icons.stop_circle_outlined;
+      case DownloadStatus.queued:
+        return Icons.schedule;
+    }
+  }
+}

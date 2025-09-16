@@ -1,0 +1,40 @@
+{
+  "resultCount": 3,
+  "results": [
+    {
+      "wrapperType": "track",
+      "kind": "podcast",
+      "collectionId": 111111,
+      "collectionName": "Swift Talk 台灣",
+      "artistName": "Swift 社群",
+      "feedUrl": "https://example.com/swift-talk.xml",
+      "artworkUrl600": "https://example.com/swift-600.jpg",
+      "primaryGenreName": "Technology",
+      "country": "tw",
+      "description": "Swift 與行動開發的討論"
+    },
+    {
+      "wrapperType": "track",
+      "kind": "podcast",
+      "collectionId": 222222,
+      "collectionName": "Dev Life",
+      "artistName": "Dev 團隊",
+      "feedUrl": "https://example.com/dev-life.xml",
+      "artworkUrl100": "https://example.com/dev-100.jpg",
+      "primaryGenreName": "Business",
+      "country": "tw"
+    },
+    {
+      "wrapperType": "podcastEpisode",
+      "kind": "podcast-episode",
+      "trackId": 333333,
+      "trackName": "排程與背景作業的一天",
+      "description": "介紹 WorkManager 與自動下載",
+      "episodeGuid": "episode-333",
+      "episodeUrl": "https://cdn.example.com/dev-life-333.mp3",
+      "artworkUrl600": "https://example.com/dev-episode-600.jpg",
+      "trackTimeMillis": 1980000,
+      "releaseDate": "2024-01-01T09:00:00Z"
+    }
+  ]
+}

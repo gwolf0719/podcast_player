@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:im="http://itunes.apple.com/rss">
+  <title>Top Podcasts</title>
+  <updated>2024-01-01T12:00:00-07:00</updated>
+  <entry>
+    <id im:id="1000000000">https://podcasts.apple.com/podcast/sample-a/id1000000000</id>
+    <link rel="alternate" type="text/html" href="https://feeds.example.com/sample-a"/>
+    <title>Sample Podcast A</title>
+    <im:name>Sample Podcast A</im:name>
+    <im:artist href="https://podcasts.apple.com/artist/sample-artist/id1111">Sample Artist A</im:artist>
+    <summary>Podcast A summary</summary>
+    <im:image height="170">https://example.com/a-170.jpg</im:image>
+    <im:image height="600">https://example.com/a-600.jpg</im:image>
+    <category label="Technology" term="Technology"/>
+  </entry>
+  <entry>
+    <id im:id="2000000000">https://podcasts.apple.com/podcast/sample-b/id2000000000</id>
+    <link rel="alternate" type="text/html" href="https://feeds.example.com/sample-b"/>
+    <title>Sample Podcast B</title>
+    <im:name>Sample Podcast B</im:name>
+    <im:artist>Sample Artist B</im:artist>
+    <summary>Podcast B summary</summary>
+    <im:image height="170">https://example.com/b-170.jpg</im:image>
+    <category label="Society" term="Society"/>
+  </entry>
+</feed>
