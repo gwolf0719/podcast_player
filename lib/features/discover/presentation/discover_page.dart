@@ -55,12 +55,9 @@ class _DiscoverContent extends ConsumerWidget {
       onRefresh: () => ref.read(discoverControllerProvider.notifier).refresh(),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final isWide = constraints.maxWidth > 720;
-          final crossAxisCount = isWide ? 3 : 1;
-          final cardWidth = isWide
-              ? (constraints.maxWidth - ((crossAxisCount - 1) * 16)) /
-                    crossAxisCount
-              : constraints.maxWidth;
+          // 響應式設計：根據螢幕寬度和方向決定每行卡片數量
+          final crossAxisCount = _getCrossAxisCount(constraints.maxWidth);
+          final cardWidth = (constraints.maxWidth - ((crossAxisCount + 1) * 16)) / crossAxisCount;
 
           if (podcasts.isEmpty) {
             return ListView(
@@ -125,7 +122,7 @@ class _DiscoverContent extends ConsumerWidget {
                     crossAxisCount: crossAxisCount,
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
-                    mainAxisExtent: 210,
+                    childAspectRatio: _getCardAspectRatio(crossAxisCount),
                   ),
                   delegate: SliverChildBuilderDelegate((context, index) {
                     final podcast = filteredPodcasts[index];
@@ -189,6 +186,39 @@ class _DiscoverContent extends ConsumerWidget {
     }
 
     return list;
+  }
+
+  /// 根據螢幕寬度決定每行顯示的卡片數量
+  /// 直式（窄螢幕）：2個卡片
+  /// 橫式（寬螢幕）：6個卡片
+  int _getCrossAxisCount(double screenWidth) {
+    if (screenWidth < 600) {
+      // 手機直式模式
+      return 2;
+    } else if (screenWidth < 1200) {
+      // 平板或手機橫式模式
+      return 4;
+    } else {
+      // 大螢幕或桌面模式
+      return 6;
+    }
+  }
+
+  /// 根據每行卡片數量決定卡片寬高比
+  /// 使用 aspect ratio 讓卡片自動適應高度
+  double _getCardAspectRatio(int crossAxisCount) {
+    switch (crossAxisCount) {
+      case 2:
+        // 直式模式：較高的卡片，給文字更多空間 (寬:高 = 0.55:1)
+        return 0.55;
+      case 4:
+        // 平板模式：中等比例 (寬:高 = 0.6:1)
+        return 0.6;
+      case 6:
+      default:
+        // 橫式或大螢幕模式：較寬的卡片 (寬:高 = 0.65:1)
+        return 0.65;
+    }
   }
 }
 

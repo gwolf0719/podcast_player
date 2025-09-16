@@ -58,8 +58,8 @@ class DownloadWorkManager {
       _downloadMaintenanceTask,
       frequency: frequency,
       initialDelay: const Duration(minutes: 5),
-      constraints: const Constraints(networkType: NetworkType.connected),
-      existingWorkPolicy: ExistingWorkPolicy.keep,
+      constraints: Constraints(networkType: NetworkType.connected),
+      existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
     );
   }
 }

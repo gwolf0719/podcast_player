@@ -6,6 +6,7 @@ import '../../../core/audio/audio_engine.dart';
 import '../../../core/data/models/podcast.dart';
 import '../../../core/data/models/podcast.dart' as models show Episode;
 import 'playback_state.dart';
+import 'playback_queue_controller.dart';
 
 final audioPlayerControllerProvider =
     NotifierProvider<AudioPlayerController, PlaybackState?>(
@@ -60,6 +61,8 @@ class AudioPlayerController extends Notifier<PlaybackState?> {
             isPlaying: false,
             position: current.duration,
           );
+          // 自動播放下一首
+          _playNextInQueue();
           break;
         case EngineProcessingState.idle:
           state = current.copyWith(isLoading: false, isPlaying: status.playing);
@@ -122,6 +125,42 @@ class AudioPlayerController extends Notifier<PlaybackState?> {
   Future<void> stop() async {
     await _engine.stop();
     state = null;
+  }
+
+  /// 播放下一首（從隊列）
+  Future<void> playNext() async {
+    final queueController = ref.read(playbackQueueControllerProvider.notifier);
+    final nextEpisode = queueController.moveToNext();
+    
+    if (nextEpisode != null) {
+      await playEpisode(
+        nextEpisode.podcast,
+        nextEpisode.episode,
+        localFilePath: nextEpisode.localFilePath,
+      );
+    }
+  }
+
+  /// 播放上一首（從隊列）
+  Future<void> playPrevious() async {
+    final queueController = ref.read(playbackQueueControllerProvider.notifier);
+    final previousEpisode = queueController.moveToPrevious();
+    
+    if (previousEpisode != null) {
+      await playEpisode(
+        previousEpisode.podcast,
+        previousEpisode.episode,
+        localFilePath: previousEpisode.localFilePath,
+      );
+    }
+  }
+
+  /// 自動播放下一首（內部使用）
+  Future<void> _playNextInQueue() async {
+    final queue = ref.read(playbackQueueControllerProvider);
+    if (queue.hasNext) {
+      await playNext();
+    }
   }
 
   void _cleanupSubscriptions() {

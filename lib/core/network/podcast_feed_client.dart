@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
@@ -16,12 +17,21 @@ class PodcastFeedClient {
   final http.Client httpClient;
 
   Future<List<models.Episode>> fetchEpisodes(String feedUrl) async {
-    final response = await httpClient.get(Uri.parse(feedUrl));
+    final response = await httpClient.get(
+      Uri.parse(feedUrl),
+      headers: {
+        'Accept': 'application/xml',
+        'Accept-Charset': 'utf-8',
+        'User-Agent': 'PodcastPlayer/1.0 (Flutter)',
+      },
+    );
     if (response.statusCode != 200) {
       throw Exception('無法載入 feed：${response.reasonPhrase}');
     }
 
-    return _parseFeed(response.body);
+    // 確保以 UTF-8 解碼回應
+    final responseBody = utf8.decode(response.bodyBytes);
+    return _parseFeed(responseBody);
   }
 
   List<models.Episode> _parseFeed(String xmlString) {

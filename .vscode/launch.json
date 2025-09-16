@@ -1,0 +1,42 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "🔥 Pixel 9 XL 熱重載",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "emulator-5554",
+            "program": "lib/main.dart",
+            "args": [
+                "--hot"
+            ],
+            "console": "debugConsole",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ANDROID_HOME": "~/Library/Android/sdk",
+                "ANDROID_SDK_ROOT": "~/Library/Android/sdk"
+            }
+        },
+        {
+            "name": "🚀 Pixel 9 XL 一般運行",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "emulator-5554",
+            "program": "lib/main.dart",
+            "console": "debugConsole",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "🧪 Pixel 9 XL 除錯模式",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "emulator-5554",
+            "program": "lib/main.dart",
+            "console": "debugConsole",
+            "cwd": "${workspaceFolder}",
+            "vmAdditionalArgs": [
+                "--enable-asserts"
+            ]
+        }
+    ]
+}
