@@ -37,10 +37,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: 安裝 Flutter SDK
+      - name: 安裝 Flutter SDK（stable 渠道）
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 'stable'
+          channel: 'stable'
 
       - name: Flutter 版本與環境
         run: |
